@@ -1,0 +1,80 @@
+#!/sbin/runscript
+
+#/***************************************************************************
+# *   Copyright (C) 2015 Daniel Mueller (deso@posteo.net)                   *
+# *                                                                         *
+# *   This program is free software: you can redistribute it and/or modify  *
+# *   it under the terms of the GNU General Public License as published by  *
+# *   the Free Software Foundation, either version 3 of the License, or     *
+# *   (at your option) any later version.                                   *
+# *                                                                         *
+# *   This program is distributed in the hope that it will be useful,       *
+# *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+# *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+# *   GNU General Public License for more details.                          *
+# *                                                                         *
+# *   You should have received a copy of the GNU General Public License     *
+# *   along with this program.  If not, see <http://www.gnu.org/licenses/>. *
+# ***************************************************************************/
+
+# $Header: Init script for automated running of btrfs-backup.$
+
+
+depend() {
+  # TODO: The dependencies listed here are specific to the shutdown
+  #       process. Perhaps the user wants to run the script at start up,
+  #       then things would be screwed. Fix this.
+  # TODO: It appears that whenever a service is listed here but does not
+  #       exist in the run level the program will *not* start up at all.
+  #       This happened with 'savecache' which is not used on my system.
+  #       This is error prone and not very portable. Find a way to work
+  #       around this issue.
+  before killprocs mount-ro
+}
+
+start() {
+  ebegin "Starting btrfs backup process"
+
+  # TODO: Make the various bits somehow configurable.
+  local btrfs_backup="/usr/bin/btrfs-backup"
+  local mount="/mnt/backup"
+  local src="/snapshots"
+  local dst="${mount}/backup"
+  local subvolumes=$(cat <<EOF
+/local
+/root
+EOF
+)
+  local subvols=$(
+      echo -e "${subvolumes}" |\
+      xargs --max-lines=1 --replace='{}' -- echo "--subvolume={}" |\
+      xargs
+    )
+  local args="backup ${subvols} ${src} ${dst}"
+
+  if ! mountpoint --quiet "${mount}" &> /dev/null; then
+    if ! mount "${mount}" &> /dev/null; then
+      eerror "Failed to mount ${mount}"
+      eend $?
+      return 1
+    fi
+
+    mounted=1
+  else
+    mounted=0
+  fi
+
+  # TODO: Need to iron out what btrfs-backup prints and what we want to
+  #       appear here.
+  if ! "${btrfs_backup}" ${args}; then
+    eerror "btrfs-backup failed"
+  fi
+  result=$?
+
+  if [ ${mounted} -ne 0 ]; then
+    if ! umount "${mount}" &> /dev/null; then
+      eerror "Failed to unmount ${mount}"
+    fi
+  fi
+  eend ${result}
+}
