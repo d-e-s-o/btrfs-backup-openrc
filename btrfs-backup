@@ -30,6 +30,10 @@ depend() {
   #       This is error prone and not very portable. Find a way to work
   #       around this issue.
   before killprocs mount-ro
+
+  # Backups can potentially take a long time. Disable the default
+  # timeout that is imposed on standard init scripts.
+  keyword -timeout
 }
 
 start() {
