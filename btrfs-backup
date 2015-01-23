@@ -42,6 +42,7 @@ start() {
   # TODO: Make the various bits somehow configurable.
   local btrfs_backup="/usr/bin/btrfs-backup"
   local mount="/mnt/backup"
+  local options="--keep-for=1w"
   local src="/snapshots"
   local dst="${mount}/backup"
   local subvolumes=$(cat <<EOF
@@ -54,7 +55,7 @@ EOF
       xargs --max-lines=1 --replace='{}' -- echo "--subvolume={}" |\
       xargs
     )
-  local args="backup ${subvols} ${src} ${dst}"
+  local args="backup ${options} ${subvols} ${src} ${dst}"
 
   if ! mountpoint --quiet "${mount}" &> /dev/null; then
     if ! mount "${mount}" &> /dev/null; then
