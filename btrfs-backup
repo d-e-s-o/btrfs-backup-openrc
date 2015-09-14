@@ -42,7 +42,7 @@ start() {
   # TODO: Make the various bits somehow configurable.
   local btrfs_backup="/usr/bin/btrfs-backup"
   local mount="/mnt/backup"
-  local options="--keep-for=1w"
+  local options="--keep-for=1w --debug"
   local src="/snapshots"
   local dst="${mount}/backup"
   local subvolumes=$(cat <<EOF
