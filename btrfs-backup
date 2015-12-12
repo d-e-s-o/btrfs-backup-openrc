@@ -39,25 +39,44 @@ depend() {
 start() {
   ebegin "Starting btrfs backup process"
 
-  # TODO: Make the various bits somehow configurable.
-  local btrfs_backup="/usr/bin/btrfs-backup"
-  local mount="/mnt/backup"
-  local options="--keep-for=1w --debug"
-  local src="/snapshots"
-  local dst="${mount}/backup"
-  local subvolumes=$(cat <<EOF
-/local
-/root
-EOF
-)
+  # We need to explicitly read in the conf.d configuration here. The
+  # reason is that if the init.d script is just a symlink then OpenRC
+  # will not source the configuration file correctly.
+  # TODO: It is unclear whether RC_SVCNAME, RC_SERVICE, or SVCNAME is
+  #       the "correct" variable to use.
+  local conf="/etc/conf.d/${RC_SVCNAME}"
+  source ${conf}
+
+  if [ -z "${BTRFS_BACKUP_SRCREPO}" -o\
+       -z "${BTRFS_BACKUP_DSTREPO}" -o\
+       -z "${BTRFS_BACKUP_SUBVOLS}" ]; then
+    eerror "The following variables are required for ${RC_SVCNAME} to work: "
+    eerror "BTRFS_BACKUP_SRCREPO: The source repository, i.e., the directory "
+    eerror "                      where snapshots are stored."
+    eerror "BTRFS_BACKUP_DSTREPO: The destination repository."
+    eerror "BTRFS_BACKUP_SUBVOLS: A list of subvolumes to backup."
+    eerror ""
+    eerror "Please define them in ${conf}."
+    return 1
+  fi
+
+  # BTRFS_BACKUP_PROG is optional.
+  local btrfs_backup=${BTRFS_BACKUP_PROG:-"/usr/bin/btrfs-backup"}
+  # BTRFS_BACKUP_MOUNT is optional.
+  local mount=${BTRFS_BACKUP_MOUNT:-""}
+  # BTRFS_BACKUP_OPTS is optional.
+  local options=${BTRFS_BACKUP_OPTS:-""}
+  local src="${BTRFS_BACKUP_SRCREPO}"
+  local dst="${BTRFS_BACKUP_DSTREPO}"
+
   local subvols=$(
-      echo -e "${subvolumes}" |\
+      echo -e "${BTRFS_BACKUP_SUBVOLS}" |\
       xargs --max-lines=1 --replace='{}' -- echo "--subvolume={}" |\
       xargs
     )
   local args="backup ${options} ${subvols} ${src} ${dst}"
 
-  if ! mountpoint --quiet "${mount}" &> /dev/null; then
+  if test -n "${mount}" && ! mountpoint --quiet "${mount}" &> /dev/null; then
     if ! mount "${mount}" &> /dev/null; then
       eerror "Failed to mount ${mount}"
       eend $?
@@ -72,7 +91,7 @@ EOF
   # TODO: Need to iron out what btrfs-backup prints and what we want to
   #       appear here.
   if ! "${btrfs_backup}" ${args}; then
-    eerror "btrfs-backup failed"
+    eerror "${btrfs_backup} failed"
   fi
   result=$?
 
