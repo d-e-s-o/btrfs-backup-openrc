@@ -104,7 +104,8 @@ EOF
     if ! mount "${mount}" &> /dev/null; then
       error "Failed to mount ${mount}"
       eend $?
-      return 1
+      # We still want the script to succeed.
+      return 0
     fi
 
     mounted=1
